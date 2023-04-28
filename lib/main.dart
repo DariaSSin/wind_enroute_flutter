@@ -125,7 +125,6 @@ class _ExampleHomeScreenState extends State<ExampleHomeScreen> {
     print('\n');
 
     // пример данных по ветру для каждой рабочей точки 
-    // пока предполагаем расчет для высоты FL10
     Map uuts = {"Lat":"56.5","Lon":"35.0","DATETIME":"2023040515Z","WIND\/T":{"FL10":{"wind_dir_deg_int":140,"wind_sp_mps_int":8,"air_temp_deg_C_int":13,"wind_and_temp_str":"140\/08MPS PS13"},"FL20":{"wind_dir_deg_int":150,"wind_sp_mps_int":6,"air_temp_deg_C_int":11,"wind_and_temp_str":"150\/06MPS PS11"},"FL30":{"wind_dir_deg_int":170,"wind_sp_mps_int":6,"air_temp_deg_C_int":7,"wind_and_temp_str":"170\/06MPS PS07"},"FL50":{"wind_dir_deg_int":190,"wind_sp_mps_int":8,"air_temp_deg_C_int":3,"wind_and_temp_str":"190\/08MPS PS03"}}};
     Map uuey = {"Lat":"56.8","Lon":"36.3","DATETIME":"2023040515Z","WIND\/T":{"FL10":{"wind_dir_deg_int":150,"wind_sp_mps_int":7,"air_temp_deg_C_int":13,"wind_and_temp_str":"140\/08MPS PS13"},"FL20":{"wind_dir_deg_int":150,"wind_sp_mps_int":6,"air_temp_deg_C_int":11,"wind_and_temp_str":"150\/06MPS PS11"},"FL30":{"wind_dir_deg_int":170,"wind_sp_mps_int":6,"air_temp_deg_C_int":7,"wind_and_temp_str":"170\/06MPS PS07"},"FL50":{"wind_dir_deg_int":190,"wind_sp_mps_int":8,"air_temp_deg_C_int":3,"wind_and_temp_str":"190\/08MPS PS03"}}};
     Map uuey2 = {"Lat":"56.9","Lon":"37.9","DATETIME":"2023040515Z","WIND\/T":{"FL10":{"wind_dir_deg_int":150,"wind_sp_mps_int":6,"air_temp_deg_C_int":13,"wind_and_temp_str":"140\/08MPS PS13"},"FL20":{"wind_dir_deg_int":150,"wind_sp_mps_int":6,"air_temp_deg_C_int":11,"wind_and_temp_str":"150\/06MPS PS11"},"FL30":{"wind_dir_deg_int":170,"wind_sp_mps_int":6,"air_temp_deg_C_int":7,"wind_and_temp_str":"170\/06MPS PS07"},"FL50":{"wind_dir_deg_int":190,"wind_sp_mps_int":8,"air_temp_deg_C_int":3,"wind_and_temp_str":"190\/08MPS PS03"}}};
@@ -144,6 +143,7 @@ class _ExampleHomeScreenState extends State<ExampleHomeScreen> {
     
     // проходим по всем элементам list "windsAllData", извлекаем по ключам нужные данные о ветре
     for (Map i in windsAllData) {
+      // пока предполагаем расчет для высоты FL10 (впоследствии подставлять из флайтплана)
       int meteo_wind_dir_deg = i["WIND\/T"]["FL10"]["wind_dir_deg_int"];
       int wind_sp_mps = i["WIND\/T"]["FL10"]["wind_sp_mps_int"];
 
@@ -162,12 +162,13 @@ class _ExampleHomeScreenState extends State<ExampleHomeScreen> {
         nav_wind_dir_deg = 0;
       }
 
-      // создаем map для записи направления и скорости ветра по ключам (для конкретной точки)
+      // создаем map для записи направления и скорости навигационного ветра 
+      //по ключам (для конкретной точки)
       Map <String, int> windAtPoint = {};
       windAtPoint['direction'] = nav_wind_dir_deg;
       windAtPoint['speed'] = wind_sp_mps;
 
-      // собираем данные о ветре по всем точкам в list
+      // собираем данные о навигационном ветре по всем точкам в list
       onlyNeededWinds.add(windAtPoint);
     }
     print(onlyNeededWinds);
@@ -200,37 +201,26 @@ class _ExampleHomeScreenState extends State<ExampleHomeScreen> {
       var windAngleRadians = (windAngleDegrees*pi)/180;
 
       // вычисляем косинус угла ветра:
-      //положительный косинус - встречный ветер, отрицательный - попутный ветер
+      //положительный косинус - попутный ветер, отрицательный - встречный ветер
       double cosOfAngle = cos(windAngleRadians);
-      print(cosOfAngle);
 
-      // вычисляем поправку к скорости в м/сек:
-      // берем косинус с обратным знаком, чтобы поправка к скорости была положительная 
-      //в случае попутного ветра, и отрицательная в случае встречного ветра 
-      double speedCorrectionMPS = (-cosOfAngle)*(onlyNeededWinds[i]['speed']);
-      print(speedCorrectionMPS);
+      // вычисляем поправку к скорости в м/сек: 
+      double speedCorrectionMPS = cosOfAngle*(onlyNeededWinds[i]['speed']);
 
       // вычисляем поправку к скорости в км/ч:
       double speedCorrectionKMH = speedCorrectionMPS*3.6;
-      print(speedCorrectionKMH);
 
       // вычисляем путевую скорость ВС (т.е. с учетом ветра):
       double actualAircraftSpeed = aircraftSpeedKMH + speedCorrectionKMH;
-      print(actualAircraftSpeed);
 
       // вычисляем штилевое время в часах
       double baseFlightTime = (bearingDistanceAllPoints[i]['distance'])/aircraftSpeedKMH;
-      print(baseFlightTime);
 
       // вычисляем время в часах на рабочем участке с учетом ветра
       double actualFlightTime = (bearingDistanceAllPoints[i]['distance'])/actualAircraftSpeed;
-      print(actualFlightTime);
 
       // вычисляем поправку ко времени полета по рабочему участку в минутах
-      // берем со знаком минус тк если фактическое время меньше штилевого, поправка должна 
-      // отображаться как отрицательная = "затратите меньше времени чем расчитывали"
-      double timeCorrectionMIN = -((baseFlightTime - actualFlightTime)*60);
-      print(timeCorrectionMIN);
+      double timeCorrectionMIN = (actualFlightTime - baseFlightTime)*60;
 
       // собираем поправки для конкретной точки в рабочий map
       Map speedTimeCorrectionsOnePoint = {};
@@ -257,7 +247,7 @@ class _ExampleHomeScreenState extends State<ExampleHomeScreen> {
     //сохраняем в map значение общей поправки по ключу
     meanWindTimeCorrections['meanTimeCorrectionMIN'] = meanTimeCorrection;
     print(meanWindTimeCorrections);
-    print('\n');
+    
 
     return Scaffold(
       appBar: AppBar(
